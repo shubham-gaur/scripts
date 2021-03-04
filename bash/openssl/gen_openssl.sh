@@ -47,6 +47,11 @@ echo -e "INFO: Generating private key..."
 openssl genrsa -des3 -out $OUT/$DOMAIN.key -passout env:PASSPHRASE 2048
 fail_if_error $?
 
+# Generate root ca
+openssl genrsa -des3 -out $OUT/rootCA.key  -passout env:PASSPHRASE 4096
+echo -e "INFO: Generating root CA..."
+openssl req -x509 -new -nodes -subj "$(echo -n "$subj" | tr "\n" "/")" -key $OUT/rootCA.key -days 1024 -out $OUT/rootCA.crt  -passin env:PASSPHRASE
+
 # Generate the CSR
 openssl req \
     -new \
@@ -61,12 +66,13 @@ fail_if_error $?
 
 # Strip the password so we don't have to type it every time we restart Apache
 echo -e "INFO: Generating organization key..."
-openssl rsa -in $OUT/$DOMAIN.key.org -out $OUT/$DOMAIN.key -passin env:PASSPHRASE
+openssl rsa  -in $OUT/$DOMAIN.key.org -out $OUT/$DOMAIN.key -passin env:PASSPHRASE
 fail_if_error $?
 
 # Generate the cert (good for 10 years)
 echo -e "INFO: Generating certificates..."
-openssl x509 -req -days 3650 -in $OUT/$DOMAIN.csr -signkey $OUT/$DOMAIN.key -out $OUT/$DOMAIN.crt
+openssl x509 -req -days 3650 -CA $OUT/rootCA.crt -CAkey $OUT/rootCA.key  -CAcreateserial -in $OUT/$DOMAIN.csr  -signkey $OUT/$DOMAIN.key -out $OUT/$DOMAIN.crt -passin env:PASSPHRASE
+
 fail_if_error $?
 echo -e "INFO: Certificate generation completed!"
 
